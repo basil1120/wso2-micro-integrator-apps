@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+    <api context="/pesalink/verification" name="PesalinkVerification" xmlns="http://ws.apache.org/ns/synapse">
+        <resource methods="POST" uri-template="/pesalink/verification">
+        <!-- Incoming Request Handling -->
+        <inSequence>
+            <!-- <oauthService  password="admin" remoteServiceUrl="https://wso2-is.com/" username="admin"/> -->
+            <!-- Log the incoming request -->
+            <log level="full"/>
+
+            <property name="customErrorCode" value="CUSTOM_ERROR_CODE"/>
+            <property name="customErrorMessage" value="This is my custom error message"/>
+
+           <!-- STEP 0.0: Validate the request payload - JSON Schema Validation -->
+     
+             <!--<validate>-->
+                <!-- <schema key="conf:/schemas/PesalinkRequestSchema.json"/> -->
+                <!-- <schema key="schemas/PesalinkRequestSchema.json"/> -->
+                <!-- <schema key="file:schemas/PesalinkRequestSchema.json"/> -->
+                <!-- <schema key="file:Resources/schemas/PesalinkRequestSchema.json"/> -->
+                 <!--
+                <on-fail>
+                    <payloadFactory media-type="json">
+                    <format>
+                        {
+                            "header": {
+                                "statusCode": "1",
+                                "statusCodeMessage": "ERROR",
+                                "errorCode": "400",
+                                "errorCodeMessage": "Bad Request - Invalid request payload"
+                            },
+                            "body": {
+                            }
+                        }
+                    </format>
+                    </payloadFactory>
+                    <property name="HTTP_SC" value="400" scope="axis2"/>
+                    <respond/>
+                </on-fail>
+            </validate>
+            -->
+
+   
+
+            <!-- STEP 0.1: Store the initial request payload in a property -->
+            <property name="initialPayload" expression="json-eval($)" scope="default"/>
+
+
+
+            <!-- STEP 1: Call the OAuth2 Token API to get the bearer token -->
+            <!-- Set headers for the OAuth2 Token API -->
+            <property name="messageType" value="application/x-www-form-urlencoded" scope="axis2"/>
+            <property name="Authorization" value="Basic bWU0aElfVmRqYWd0QnluakdTVjlpbDhhWVhrYTpva1FpdVU4Qk1JQWRwR3pYTEhQMWxOMjJ1M1lh" scope="transport"/>
+            <!-- Create the URL-encoded payload for the OAuth2 Token API -->
+            <payloadFactory media-type="json">
+                <format>{"grant_type":"client_credentials"}</format>
+                <args/>
+            </payloadFactory>
+            <!-- Call the OAuth2 Token API -->
+            <call>
+                <endpoint name="GetAccessToken">
+                    <http method="POST" uri-template="https://ep.bbbank.so:9443/oauth2/token">
+                        <suspendOnFailure>
+                            <initialDuration>1000</initialDuration>
+                            <progressionFactor>2.0</progressionFactor>
+                            <maximumDuration>60000</maximumDuration>
+                        </suspendOnFailure>
+                        <markForSuspension>
+                            <retriesBeforeSuspension>3</retriesBeforeSuspension>
+                            <retryDelay>1000</retryDelay>
+                        </markForSuspension>
+                    </http>
+                </endpoint>
+            </call>
+            <!-- LOG OAUTH2 TOKEN RESPONSE (1. ONE )-->
+            <log level="custom">
+                <property name="message" value="OAuth Token Response - Masked"/>
+                <property name="access_token" value="****MASKED****"/>
+                <property name="refresh_token" value="****MASKED****"/>
+                <property name="scope" expression="json-eval($.scope)"/>
+                <property name="token_type" expression="json-eval($.token_type)"/>
+                <property name="expires_in" expression="json-eval($.expires_in)"/>
+            </log>
+            <!-- LOG OAUTH2 TOKEN RESPONSE (2. TWO )-->
+            <property name="scope" expression="json-eval($.scope)"/>
+            <property name="token_type" expression="json-eval($.token_type)"/>
+            <property name="expires_in" expression="json-eval($.expires_in)"/>
+            <payloadFactory media-type="json">
+            <format>
+                {
+                    "access_token": "********** MASKED *********",
+                    "refresh_token": "********** MASKED *********",
+                    "scope": "$1",
+                    "token_type": "$2",
+                    "expires_in": $3
+                }
+            </format>
+            <args>
+                <arg expression="get-property('scope')"/>
+                <arg expression="get-property('token_type')"/>
+                <arg expression="get-property('expires_in')"/>
+            </args>
+            </payloadFactory>
+            <log level="full"/>
+   
+
+            <!-- Extract the access token from the OAuth2 Token API response -->
+            <property name="accessToken" expression="json-eval($.access_token)"/>
+            <!-- STEP 2: Call the downstream API using the retrieved token -->
+            <!-- (a) Restore the initial request payload -->
+            <payloadFactory media-type="json">
+                <format>$1</format>
+                <args>
+                    <arg expression="get-property('initialPayload')"/>
+                </args>
+            </payloadFactory>
+           <!-- (b) Extract values from the JSON payload -->
+            <property name="messageId" expression="json-eval($.header.messageId)" scope="default"/>
+            <property name="organizationId" expression="json-eval($.body.organizationId)" scope="default"/>
+            <property name="senderBankCode" expression="json-eval($.body.senderBankCode)" scope="default"/>
+            <property name="beneficiaryBankCode" expression="json-eval($.body.beneficiaryBankCode)" scope="default"/>
+            <property name="beneficiaryAccountNumber" expression="json-eval($.body.beneficiaryAccountNumber)" scope="default"/>
+            <!-- (c) Create Required Target Request Payload -->
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "messageId": "$1",
+                        "organizationId": "$2",
+                        "senderBankCode": "$3",
+                        "beneficiaryBankCode": "$4",
+                        "beneficiaryAccountNumber": "$5"
+                    }
+                </format>
+                <args>
+                    <arg expression="get-property('messageId')"/>
+                    <arg expression="get-property('organizationId')"/>
+                    <arg expression="get-property('senderBankCode')"/>
+                    <arg expression="get-property('beneficiaryBankCode')"/>
+                    <arg expression="get-property('beneficiaryAccountNumber')"/>
+                </args>
+            </payloadFactory>
+            <!-- (e) Log Target Request/Transformed New Payload-->
+            <log level="full"/> 
+            <!-- (f) Set headers for the downstream API call -->
+            <header name="Content-Type" value="application/json" scope="transport"/>
+            <header name="Authorization" expression="fn:concat('Bearer ', $ctx:accessToken)" scope="transport"/>
+            <!-- (g) Call the external API -->
+            <call>
+                <endpoint name="PesalinkEndpoint">
+                    <http method="POST" uri-template="https://api-gateway.mwnmarketplace.com:30532/pesalink/outgoing/service/1.0.0/api/v1/verification-request">
+                        <suspendOnFailure>
+                            <initialDuration>1000</initialDuration>
+                            <progressionFactor>2.0</progressionFactor>
+                            <maximumDuration>60000</maximumDuration>
+                        </suspendOnFailure>
+                        <markForSuspension>
+                            <retriesBeforeSuspension>3</retriesBeforeSuspension>
+                            <retryDelay>1000</retryDelay>
+                        </markForSuspension>
+                        <timeout>
+                            <duration>60000</duration>
+                            <responseAction>fault</responseAction>
+                        </timeout>
+                    </http>
+                </endpoint>
+            </call>
+
+            <!-- (h) Log the response from the external API -->
+            <log level="full"/>
+
+            <!-- STEP 3: Modify the response to add custom errorCode and errorCodeMessage -->
+            <!-- (a) Extract values from the JSON response -->
+            <property name="messageId" expression="json-eval($.messageId)"/>
+            <property name="messageEndToEndId" expression="json-eval($.messageEndToEndId)"/>
+            <property name="beneficiaryBankCode" expression="json-eval($.beneficiaryBankCode)"/>
+            <property name="beneficiaryBankName" expression="json-eval($.beneficiaryBankName)"/>
+            <property name="beneficiaryAccountNumber" expression="json-eval($.beneficiaryAccountNumber)"/>
+            <property name="beneficiaryAccountName" expression="json-eval($.beneficiaryAccountName)"/>
+            <property name="beneficiaryAccountStatus" expression="json-eval($.beneficiaryAccountStatus)"/>
+            <property name="statusCode" expression="json-eval($.statusCode)"/>
+            <property name="statusCodeMessage" expression="json-eval($.statusCodeMessage)"/>
+            <!-- (b) Create Required Target Response Payload -->
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "header": {
+                            "messageId": "$1",
+                            "statusCode": "$8",
+                            "statusCodeMessage": "$9",
+                            "errorCode": "CUSTOM_ERROR_CODE",
+                            "errorCodeMessage": "This is my custom error message"
+                        },
+                        "body": {
+                            "messageEndToEndId":  "$2",
+                            "beneficiaryBankCode": "$3",
+                            "beneficiaryBankName": "$4",
+                            "beneficiaryAccountNumber": "$5",
+                            "beneficiaryAccountName": "$6",
+                            "beneficiaryAccountStatus": "$7",
+                        }
+                    }
+                </format>
+                <args>
+                    <arg expression="get-property('messageId')"/>
+                    <arg expression="get-property('messageEndToEndId')"/>
+                    <arg expression="get-property('beneficiaryBankCode')"/>
+                    <arg expression="get-property('beneficiaryBankName')"/>
+                    <arg expression="get-property('beneficiaryAccountNumber')"/>
+                    <arg expression="get-property('beneficiaryAccountName')"/>
+                    <arg expression="get-property('beneficiaryAccountStatus')"/>
+                    <arg expression="get-property('statusCode')"/>
+                    <arg expression="get-property('statusCodeMessage')"/>
+                </args>
+            </payloadFactory>
+            <respond/>
+        </inSequence>
+
+
+        <!-- Error Handling -->
+        <faultSequence>
+            <log level="full"/>
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "header": {
+                            "statusCode": "1",
+                            "statusCodeMessage": "ERROR",
+                            "errorCode": "500",
+                            "errorCodeMessage": "An error occurred while processing the request"
+                        },
+                        "body": {
+                        }
+                    }
+                </format>
+            </payloadFactory>
+            <property name="HTTP_SC" value="500" scope="axis2"/>
+            <respond/>
+        </faultSequence>
+        </resource>
+    </api>

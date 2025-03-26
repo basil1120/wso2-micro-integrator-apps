@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+    <api context="/helloworld" name="HelloWorld" xmlns="http://ws.apache.org/ns/synapse">
+        <resource methods="GET" uri-template="/">
+            <inSequence>
+                <payloadFactory  media-type="json" template-type="default">
+                    <format>
+                        {
+                            "application": "mi-application",
+                            "message": "Hello World"
+                        }
+                    </format>
+                </payloadFactory>
+                <log category="INFO"   logMessageID="false" logFullPayload="false" >
+                <message>Logs Here</message>
+                </log>
+
+                <log level="full">
+                    <!--wso2mi/data/admin_password-->
+                    <!-- <property name="HashiCorpSecret1" expression="hashicorp:vault-lookup('wso2mi', 'admin_password')" />  -->
+                    <!-- <property name="HashiCorpSecret2" expression="hashicorp:vault-lookup('wso2mi/data', 'admin_password')" scope="default" type="STRING"/> -->
+                    <!-- <property name="HashiCorpSecret2" expression="hashicorp:vault-lookup('/wso2mi/data', 'admin_password')" scope="default" type="STRING"/> -->
+                    <!-- <property name="HashiCorpSecret2" expression="hashicorp:vault-lookup('wso2mi/data/admin_password', 'admin_password')" scope="default" type="STRING"/> -->
+                    <property name="HashiCorpSecret2" expression="hashicorp:vault-lookup('data/wso2mi', 'admin_password')" scope="default" type="STRING"/>
+                </log>
+
+                <respond />
+            </inSequence>
+            <faultSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" >
+                <message>ERROR OCCURED FAULT SEQUENCE CALLED</message>
+            </log>
+            <payloadFactory  media-type="json" template-type="default">
+                <format>ERROR OCCURED</format>
+            </payloadFactory>
+            <respond />
+            </faultSequence>
+        </resource>
+    </api>
