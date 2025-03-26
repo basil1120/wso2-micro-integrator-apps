@@ -1,4 +1,5 @@
 pipeline {
+
     agent any
 
     environment {
@@ -8,19 +9,17 @@ pipeline {
         APIMCTL_PATH = '/Users/basam/Desktop/TMB/WSO2_SERVER/wso2-apictl/apictl-4.5.0'
         ENV_NAME = 'wso2-mi'  // WSO2 Micro Integrator environment name in APIMCTL
         MI_HOST = 'https://localhost:8253'
-        MI_USERNAME = credentials('admin')  // Jenkins credential ID for MI username
-        MI_PASSWORD = credentials('admin')  // Jenkins credential ID for MI password
     }
 
     stages {
         
         stage('Clone Repo') {
-            // steps {
-            //     git branch: "${BRANCH}", url: "${GIT_REPO}"
-            // }
             steps {
-                git url: "${GIT_REPO}", credentialsId: 'CREDENTIALS_GITHUB', branch: "${BRANCH}"
+                git branch: "${BRANCH}", url: "${GIT_REPO}"
             }
+            // steps {
+            //     git url: "${GIT_REPO}", credentialsId: 'CREDENTIALS_GITHUB', branch: "${BRANCH}"
+            // }
         }
 
         stage('Build with Maven') {
@@ -72,8 +71,8 @@ pipeline {
         stage('Setup WSO2 MI Environment') {
             steps {
                 script {
-                    sh "${APIMCTL_PATH} mi add env ${ENV_NAME} --mi ${MI_HOST}"
-                    sh "${APIMCTL_PATH} mi list envs"
+                    sh "apictl mi add env ${ENV_NAME} --mi ${MI_HOST}"
+                    sh "apictl mi list envs"
                 }
             }
         }
@@ -83,8 +82,8 @@ pipeline {
                 script {
                     def carFile = sh(script: "find target -name '*.car'", returnStdout: true).trim()
                     if (carFile) {
-                        sh "${APIMCTL_PATH} login ${ENV_NAME} -u ${MI_USERNAME} -p ${MI_PASSWORD} --verbose"
-                        sh "${APIMCTL_PATH} mi import artifact --file ${carFile} -e ${ENV_NAME}"
+                        sh "apictl login ${ENV_NAME} -u admin -p admin --verbose"
+                        sh "apictl mi import artifact --file ${carFile} -e ${ENV_NAME}"
                     } else {
                         error('CAR file not found!') //apictl mi import artefact --file test.car -e dev
                     } 
