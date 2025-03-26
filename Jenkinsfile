@@ -15,9 +15,12 @@ pipeline {
     stages {
         
         stage('Clone Repo') {
-            git url: "${GIT_REPO}",
-                credentialsId: 'CREDENTIALS_GITHUB',
-                branch: "${BRANCH}"
+            // steps {
+            //     git branch: "${BRANCH}", url: "${GIT_REPO}"
+            // }
+            steps {
+                git url: "${GIT_REPO}", credentialsId: 'CREDENTIALS_GITHUB', branch: "${BRANCH}"
+            }
         }
 
         stage('Build with Maven') {
