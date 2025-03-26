@@ -5,7 +5,7 @@ pipeline {
     environment {
         GIT_REPO = 'https://github.com/basil1120/wso2-micro-integrator-apps.git'
         BRANCH = 'main'
-        MAVEN_HOME = tool 'Maven'  // Ensure Maven is configured in Jenkins
+        MAVEN_HOME = '/opt/homebrew/Cellar/maven/3.9.9/libexec'  // Ensure Maven is configured in Jenkins
         APIMCTL_PATH = '/Users/basam/Desktop/TMB/WSO2_SERVER/wso2-apictl/apictl-4.5.0'
         ENV_NAME = 'wso2-mi'  // WSO2 Micro Integrator environment name in APIMCTL
         MI_HOST = 'https://localhost:8253'
